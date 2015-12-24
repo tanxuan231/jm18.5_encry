@@ -26,6 +26,25 @@
 #define SYMTRACESTRING(s) // do nothing
 #endif
 
+void deal_h264_curpos(DecoderParams* p_LocalDec)
+{
+	NALU_t* nalu = p_LocalDec->p_Vid->nalu;
+	int len = nalu->fake_start_code_len;
+	if(!len)
+		return;
+
+	int usedbits = p_LocalDec->UsedBits;
+	int curpos = nalu->fake_start_code_curpos;
+	if(curpos < len && usedbits > 8*nalu->fake_start_code_offset[curpos])
+	{
+		p_LocalDec->cur_h264_pos += 1;	//加上一个0x03字节的长度
+		nalu->fake_start_code_curpos++;
+	}
+
+	return;
+}
+
+
 // Note that all NA values are filled with 0
 
 /*!
@@ -45,7 +64,8 @@
  *
  *************************************************************************************
  */
-int read_ue_v (char *tracestring, Bitstream *bitstream, int *used_bits)
+//int read_ue_v (char *tracestring, Bitstream *bitstream, int *used_bits)
+int read_ue_v (char *tracestring, Bitstream *bitstream, DecoderParams* p_LocalDec)
 {
   SyntaxElement symbol;
 
@@ -54,7 +74,9 @@ int read_ue_v (char *tracestring, Bitstream *bitstream, int *used_bits)
   symbol.mapping = linfo_ue;   // Mapping rule
   SYMTRACESTRING(tracestring);
   readSyntaxElement_VLC (&symbol, bitstream);
-  *used_bits+=symbol.len;
+  p_LocalDec->UsedBits += symbol.len;
+
+	deal_h264_curpos(p_LocalDec);
   return symbol.value1;
 }
 
@@ -76,7 +98,7 @@ int read_ue_v (char *tracestring, Bitstream *bitstream, int *used_bits)
  *
  *************************************************************************************
  */
-int read_se_v (char *tracestring, Bitstream *bitstream, int *used_bits)
+int read_se_v (char *tracestring, Bitstream *bitstream, DecoderParams* p_LocalDec)
 {
   SyntaxElement symbol;
 
@@ -85,7 +107,10 @@ int read_se_v (char *tracestring, Bitstream *bitstream, int *used_bits)
   symbol.mapping = linfo_se;   // Mapping rule: signed integer
   SYMTRACESTRING(tracestring);
   readSyntaxElement_VLC (&symbol, bitstream);
-  *used_bits+=symbol.len;
+  p_LocalDec->UsedBits += symbol.len;
+
+	deal_h264_curpos(p_LocalDec);
+	
   return symbol.value1;
 }
 
@@ -110,7 +135,7 @@ int read_se_v (char *tracestring, Bitstream *bitstream, int *used_bits)
  *
  *************************************************************************************
  */
-int read_u_v (int LenInBits, char*tracestring, Bitstream *bitstream, int *used_bits)
+int read_u_v (int LenInBits, char*tracestring, Bitstream *bitstream, DecoderParams* p_LocalDec)
 {
   SyntaxElement symbol;
   symbol.inf = 0;
@@ -121,7 +146,9 @@ int read_u_v (int LenInBits, char*tracestring, Bitstream *bitstream, int *used_b
   symbol.len = LenInBits;
   SYMTRACESTRING(tracestring);
   readSyntaxElement_FLC (&symbol, bitstream);
-  *used_bits += symbol.len;
+  p_LocalDec->UsedBits += symbol.len;
+
+	deal_h264_curpos(p_LocalDec);
 
   return symbol.inf;
 }
@@ -146,7 +173,7 @@ int read_u_v (int LenInBits, char*tracestring, Bitstream *bitstream, int *used_b
  *
  *************************************************************************************
  */
-int read_i_v (int LenInBits, char*tracestring, Bitstream *bitstream, int *used_bits)
+int read_i_v (int LenInBits, char*tracestring, Bitstream *bitstream, DecoderParams* p_LocalDec)
 {
   SyntaxElement symbol;
   symbol.inf = 0;
@@ -157,10 +184,12 @@ int read_i_v (int LenInBits, char*tracestring, Bitstream *bitstream, int *used_b
   symbol.len = LenInBits;
   SYMTRACESTRING(tracestring);
   readSyntaxElement_FLC (&symbol, bitstream);
-  *used_bits+=symbol.len;
+  p_LocalDec->UsedBits += symbol.len;
 
   // can be negative
   symbol.inf = -( symbol.inf & (1 << (LenInBits - 1)) ) | symbol.inf;
+
+	deal_h264_curpos(p_LocalDec);
 
   return symbol.inf;
 }
@@ -183,9 +212,9 @@ int read_i_v (int LenInBits, char*tracestring, Bitstream *bitstream, int *used_b
  *
  *************************************************************************************
  */
-Boolean read_u_1 (char *tracestring, Bitstream *bitstream, int *used_bits)
+Boolean read_u_1 (char *tracestring, Bitstream *bitstream, DecoderParams* p_LocalDec)
 {
-  return (Boolean) read_u_v (1, tracestring, bitstream, used_bits);
+  return (Boolean) read_u_v (1, tracestring, bitstream, p_LocalDec);
 }
 
 

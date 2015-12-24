@@ -38,7 +38,8 @@ static int NALUtoRBSP (NALU_t *nalu)
 {
   assert (nalu != NULL);
 
-  nalu->len = EBSPtoRBSP (nalu->buf, nalu->len, 1) ;
+  //nalu->len = EBSPtoRBSP (nalu->buf, nalu->len, 1) ;
+  nalu->len = EBSPtoRBSP (nalu, 1) ;
 
   return nalu->len ;
 }
@@ -83,6 +84,11 @@ int read_next_nalu(VideoParameters *p_Vid, NALU_t *nalu)
   CheckZeroByteNonVCL(p_Vid, nalu);
 
   //nalu->buf/nalu->len存放了转换后的RBSP数据及长度
+  /*
+  *	SODB：最原始的编码数据，没有任何附加数据
+	*	RBSP：在 SODB 的基础上加了rbsp_stop_ont_bit（bit 值为 1）并用 0 按字节补位对齐
+	*	EBSP：在 RBSP 的基础上增加了防止伪起始码字节（0X03）	
+  */
   ret = NALUtoRBSP(nalu);
 
   if (ret < 0)
@@ -159,13 +165,13 @@ void CheckZeroByteVCL(VideoParameters *p_Vid, NALU_t *nalu)
 void nal_unit_header_mvc_extension(NALUnitHeaderMVCExt_t *NaluHeaderMVCExt, Bitstream *s)
 {  
   //to be implemented;  
-  NaluHeaderMVCExt->non_idr_flag     = read_u_v (1, "non_idr_flag",     s, &p_Dec->UsedBits);
-  NaluHeaderMVCExt->priority_id      = read_u_v (6, "priority_id",      s, &p_Dec->UsedBits);
-  NaluHeaderMVCExt->view_id          = read_u_v (10, "view_id",         s, &p_Dec->UsedBits);
-  NaluHeaderMVCExt->temporal_id      = read_u_v (3, "temporal_id",      s, &p_Dec->UsedBits);
-  NaluHeaderMVCExt->anchor_pic_flag  = read_u_v (1, "anchor_pic_flag",  s, &p_Dec->UsedBits);
-  NaluHeaderMVCExt->inter_view_flag  = read_u_v (1, "inter_view_flag",  s, &p_Dec->UsedBits);
-  NaluHeaderMVCExt->reserved_one_bit = read_u_v (1, "reserved_one_bit", s, &p_Dec->UsedBits);
+  NaluHeaderMVCExt->non_idr_flag     = read_u_v (1, "non_idr_flag",     s, p_Dec);
+  NaluHeaderMVCExt->priority_id      = read_u_v (6, "priority_id",      s, p_Dec);
+  NaluHeaderMVCExt->view_id          = read_u_v (10, "view_id",         s, p_Dec);
+  NaluHeaderMVCExt->temporal_id      = read_u_v (3, "temporal_id",      s, p_Dec);
+  NaluHeaderMVCExt->anchor_pic_flag  = read_u_v (1, "anchor_pic_flag",  s, p_Dec);
+  NaluHeaderMVCExt->inter_view_flag  = read_u_v (1, "inter_view_flag",  s, p_Dec);
+  NaluHeaderMVCExt->reserved_one_bit = read_u_v (1, "reserved_one_bit", s, p_Dec);
   if(NaluHeaderMVCExt->reserved_one_bit != 1)
   {
     printf("Nalu Header MVC Extension: reserved_one_bit is not 1!\n");

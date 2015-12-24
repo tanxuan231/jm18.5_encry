@@ -41,6 +41,8 @@
 #include "frame.h"
 #include "distortion.h"
 #include "io_video.h"
+#include "nalucommon.h"
+
 
 typedef struct bit_stream_dec Bitstream;
 
@@ -434,7 +436,7 @@ typedef struct slice
   unsigned int        field_pic_flag;	//0:帧编码
   byte                bottom_field_flag;
   PictureStructure    structure;     //!< Identify picture structure type
-  int                 start_mb_nr;   //!< MUST be set by NAL even in case of ei_flag == 1
+  int                 start_mb_nr;   //!< first_mb_in_slice MUST be set by NAL even in case of ei_flag == 1
   int                 end_mb_nr_plus1;
   int                 max_part_nr;
   int                 dp_mode;       //!< data partitioning mode
@@ -984,7 +986,7 @@ char ExtractionLogFile[FILE_NAME_SIZE];
   int ref_offset;
   int poc_scale;
   int write_uv;
-  int silent;
+  int silent;	//静默,无printf
   int intra_profile_deblocking;               //!< Loop filter usage determined by flags and parameters in bitstream 
 
   // Input/output sequence format related variables
@@ -1055,6 +1057,9 @@ typedef struct decoder_params
   int                UsedBits;      // for internal statistics, is adjusted by read_se_v, read_ue_v, read_u_1
   FILE              *p_trace;        //!< Trace file
   int                bitcounter;	//@起始比特位置
+
+	int pre_h264_pos;	//上一个解码文件的位置
+  int cur_h264_pos;	//当前解码文件指针位置,相对于前一个的偏移
 } DecoderParams;
 
 extern DecoderParams  *p_Dec;
@@ -1068,7 +1073,7 @@ extern void free_global_buffers( VideoParameters *p_Vid);
 extern void free_layer_buffers( VideoParameters *p_Vid, int layer_id );
 
 extern int RBSPtoSODB(byte *streamBuffer, int last_byte_pos);
-extern int EBSPtoRBSP(byte *streamBuffer, int end_bytepos, int begin_bytepos);
+extern int EBSPtoRBSP(NALU_t *nalu, int begin_bytepos);
 
 extern void FreePartition (DataPartition *dp, int n);
 extern DataPartition *AllocPartition(int n);

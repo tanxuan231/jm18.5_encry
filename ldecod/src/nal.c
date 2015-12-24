@@ -16,6 +16,7 @@
 
 #include "contributors.h"
 #include "global.h"
+#include "nalucommon.h"
 
  /*!
  ************************************************************************
@@ -79,13 +80,17 @@ int RBSPtoSODB(byte *streamBuffer, int last_byte_pos)
 * \param begin_bytepos
 *    Position after beginning
 ************************************************************************/
-
-
-int EBSPtoRBSP(byte *streamBuffer, int end_bytepos, int begin_bytepos)
+//防止伪起始码字节（0X03）	
+//例如: 0x40 00 00 03 00 40 中03是防止伪起始码字节,应该在解码时去掉
+//在加密的时候必须记住0x03的位置
+int EBSPtoRBSP(NALU_t *nalu, int begin_bytepos)
 {
   int i, j, count;
-  count = 0;
-
+  count = 0;	//记录每个连续的0x00的个数
+	byte *streamBuffer = nalu->buf;
+	int end_bytepos = nalu->len;
+	nalu->fake_start_code_len = 0;
+	
   if(end_bytepos < begin_bytepos)
     return end_bytepos;
 
@@ -97,15 +102,18 @@ int EBSPtoRBSP(byte *streamBuffer, int end_bytepos, int begin_bytepos)
     //in NAL unit, 0x000000, 0x000001 or 0x000002 shall not occur at any byte-aligned position
     if(count == ZEROBYTES_SHORTSTARTCODE && streamBuffer[i] < 0x03) 
       return -1;
-    if(count == ZEROBYTES_SHORTSTARTCODE && streamBuffer[i] == 0x03)
+    if(count == ZEROBYTES_SHORTSTARTCODE && streamBuffer[i] == 0x03)	//即出现:0x00 00 03时
     {
-      //check the 4th byte after 0x000003, except when cabac_zero_word is used, in which case the last three bytes of this NAL unit must be 0x000003
+      //check the 4th byte after 0x000003, except when cabac_zero_word is used, 
+      //in which case the last three bytes of this NAL unit must be 0x000003
       if((i < end_bytepos-1) && (streamBuffer[i+1] > 0x03))
         return -1;
-      //if cabac_zero_word is used, the final byte of this NAL unit(0x03) is discarded, and the last two bytes of RBSP must be 0x0000
+      //if cabac_zero_word is used, the final byte of this NAL unit(0x03) is discarded, 
+      //and the last two bytes of RBSP must be 0x0000
       if(i == end_bytepos-1)
         return j;
 
+			nalu->fake_start_code_offset[nalu->fake_start_code_len++] = i;
       ++i;
       count = 0;
     }
@@ -116,6 +124,6 @@ int EBSPtoRBSP(byte *streamBuffer, int end_bytepos, int begin_bytepos)
       count = 0;
     ++j;
   }
-
+	
   return j;	//返回RBSP的字节数
 }

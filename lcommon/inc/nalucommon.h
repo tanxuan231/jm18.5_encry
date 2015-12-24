@@ -71,6 +71,14 @@ typedef struct nalu_t
   int       inter_view_flag;       //!< inter-view prediction enable
   int       reserved_one_bit;      //!< shall be equal to 1
 #endif
+
+	int cur_nalu_start;		//当前NALU在H264文件中的位置(不包括前缀码)
+  int next_nalu_start_prefix;	//下一个NALU在H264文件中的位置(包括前缀码)
+  int fake_start_code_offset[MAXNALUSIZE];  //存放着当前NAL的伪起始码从RBSP(不包括NALU head)起始位置的偏移
+  //ex:  {0x67, 0x64, 0x0, 0xb, 0xac, 0xd9, 0x42, 0xc4, 0xe8, 0x40, 0x0, 0x0, 0x3, 0x0, 0x40, 0x0, 0x0, 0xc}
+  //中NALU head是0x67,0x3所在的偏移为12
+  int fake_start_code_len;
+	int fake_start_code_curpos;	//fake_start_code_offset当前需要判断的位置
 } NALU_t;
 
 //! allocate one NAL Unit

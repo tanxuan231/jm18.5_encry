@@ -291,6 +291,8 @@ int get_annex_b_NALU (VideoParameters *p_Vid, NALU_t *nalu, ANNEXB_t *annex_b)
   fflush (p_Dec->p_trace);
 #endif
 
+	nalu->cur_nalu_start = nalu->next_nalu_start_prefix + nalu->startcodeprefix_len;
+	nalu->next_nalu_start_prefix = nalu->cur_nalu_start + nalu->len;
   return (pos);
 
 }

@@ -1370,7 +1370,7 @@ int read_new_slice(Slice *currSlice)
       fast_memcpy (currStream->streamBuffer, &nalu->buf[1], nalu->len-1);
       currStream->code_len = currStream->bitstream_length = RBSPtoSODB(currStream->streamBuffer, nalu->len-1);
 
-      currSlice->svc_extension_flag = read_u_1 ("svc_extension_flag"        , currStream, &p_Dec->UsedBits);
+      currSlice->svc_extension_flag = read_u_1 ("svc_extension_flag"        , currStream, p_Dec);
 
       if(currSlice->svc_extension_flag)
       {
@@ -1401,7 +1401,7 @@ process_nalu:
     {
     case NALU_TYPE_SLICE:
     case NALU_TYPE_IDR: //进入普通解码过程
-
+		//slice都不使用(A/B/C)分区的过程
       if (p_Vid->recovery_point || nalu->nal_unit_type == NALU_TYPE_IDR)
       {
         if (p_Vid->recovery_point_found == 0)
@@ -1559,6 +1559,7 @@ process_nalu:
       return current_header;
       break;
     case NALU_TYPE_DPA:
+	  //处理顺序:A->B->C
       if (p_Vid->recovery_point_found == 0)
         break;
 
@@ -1577,7 +1578,7 @@ process_nalu:
       currStream             = currSlice->partArr[0].bitstream;
       currStream->ei_flag    = 0;
       currStream->frame_bitoffset = currStream->read_len = 0;
-      memcpy (currStream->streamBuffer, &nalu->buf[1], nalu->len-1);
+      memcpy (currStream->streamBuffer, &nalu->buf[1], nalu->len-1);	//将nalu除了头的数据拷贝给streamBuffer
       currStream->code_len = currStream->bitstream_length = RBSPtoSODB(currStream->streamBuffer, nalu->len-1);
 #if MVC_EXTENSION_ENABLE
       currSlice->view_id = GetBaseViewId(p_Vid, &p_Vid->active_subset_sps);
@@ -1599,7 +1600,6 @@ process_nalu:
 #endif
 
       assign_quant_params (currSlice);        
-
 
       if(is_new_picture(p_Vid->dec_picture, currSlice, p_Vid->old_slice))
       {
@@ -1624,12 +1624,12 @@ process_nalu:
       // Now I need to read the slice ID, which depends on the value of
       // redundant_pic_cnt_present_flag
 
-      slice_id_a  = read_ue_v("NALU: DP_A slice_id", currStream, &p_Dec->UsedBits);
+      slice_id_a  = read_ue_v("NALU: DP_A slice_id", currStream, p_Dec);	//读取slice_id
 
       if (p_Vid->active_pps->entropy_coding_mode_flag)
         error ("received data partition with CABAC, this is not allowed", 500);
 
-      // continue with reading next DP
+      // continue with reading next DP(Data Partition)
       if (0 == read_next_nalu(p_Vid, nalu))
         return current_header;
 
@@ -1643,7 +1643,7 @@ process_nalu:
         memcpy (currStream->streamBuffer, &nalu->buf[1], nalu->len-1);
         currStream->code_len = currStream->bitstream_length = RBSPtoSODB(currStream->streamBuffer, nalu->len-1);
 
-        slice_id_b  = read_ue_v("NALU: DP_B slice_id", currStream, &p_Dec->UsedBits);
+        slice_id_b  = read_ue_v("NALU: DP_B slice_id", currStream, p_Dec);
 
         currSlice->dpB_NotPresent = 0; 
 
@@ -1656,7 +1656,7 @@ process_nalu:
         else
         {
           if (p_Vid->active_pps->redundant_pic_cnt_present_flag)
-            read_ue_v("NALU: DP_B redundant_pic_cnt", currStream, &p_Dec->UsedBits);
+            read_ue_v("NALU: DP_B redundant_pic_cnt", currStream, p_Dec);
 
           // we're finished with DP_B, so let's continue with next DP
           if (0 == read_next_nalu(p_Vid, nalu))
@@ -1680,7 +1680,7 @@ process_nalu:
 
         currSlice->dpC_NotPresent = 0;
 
-        slice_id_c  = read_ue_v("NALU: DP_C slice_id", currStream, &p_Dec->UsedBits);
+        slice_id_c  = read_ue_v("NALU: DP_C slice_id", currStream, p_Dec);
         if ((slice_id_c != slice_id_a)|| (nalu->lost_packets))
         {
           printf ("Warning: got a data partition C which does not match DP_A(DP loss!)\n");
@@ -1689,7 +1689,7 @@ process_nalu:
         }
 
         if (p_Vid->active_pps->redundant_pic_cnt_present_flag)
-          read_ue_v("NALU:SLICE_C redudand_pic_cnt", currStream, &p_Dec->UsedBits);
+          read_ue_v("NALU:SLICE_C redudand_pic_cnt", currStream, p_Dec);
       }
       else
       {
@@ -1721,26 +1721,25 @@ process_nalu:
       }
       break;
     case NALU_TYPE_SEI:
-      //printf ("read_new_slice: Found NALU_TYPE_SEI, len %d\n", nalu->len);
       InterpretSEIMessage(nalu->buf,nalu->len,p_Vid, currSlice);
+			p_Dec->pre_h264_pos = p_Dec->cur_h264_pos;
+      p_Dec->cur_h264_pos += nalu->next_nalu_start_prefix;			
       break;
     case NALU_TYPE_PPS:
-      //printf ("Found NALU_TYPE_PPS\n");
       ProcessPPS(p_Vid, nalu);
+			p_Dec->pre_h264_pos = p_Dec->cur_h264_pos;
+      p_Dec->cur_h264_pos += nalu->next_nalu_start_prefix;
       break;
     case NALU_TYPE_SPS:
-      //printf ("Found NALU_TYPE_SPS\n");
       ProcessSPS(p_Vid, nalu);
+			p_Dec->pre_h264_pos = p_Dec->cur_h264_pos;
+      p_Dec->cur_h264_pos += nalu->next_nalu_start_prefix;
       break;
     case NALU_TYPE_AUD:
-      printf ("Found NALU_TYPE_AUD\n");
-      //        printf ("read_new_slice: Found 'Access Unit Delimiter' NAL unit, len %d, ignored\n", nalu->len);
       break;
     case NALU_TYPE_EOSEQ:
-      //printf ("read_new_slice: Found 'End of Sequence' NAL unit, len %d, ignored\n", nalu->len);
       break;
     case NALU_TYPE_EOSTREAM:
-      //printf ("read_new_slice: Found 'End of Stream' NAL unit, len %d, ignored\n", nalu->len);
       break;
     case NALU_TYPE_FILL:
       if (p_Inp->silent == FALSE)
@@ -1751,16 +1750,12 @@ process_nalu:
       break;
 #if (MVC_EXTENSION_ENABLE)
     case NALU_TYPE_VDRD:
-      //printf ("Found NALU_TYPE_VDRD\n");
-      //        printf ("read_new_slice: Found 'View and Dependency Representation Delimiter' NAL unit, len %d, ignored\n", nalu->len);
-      break;
+			break;
     case NALU_TYPE_PREFIX:
-      //printf ("Found NALU_TYPE_PREFIX\n");
       if(currSlice->svc_extension_flag==1)
-        prefix_nal_unit_svc();
+        prefix_nal_unit_svc();	//empty function
       break;
     case NALU_TYPE_SUB_SPS:
-      //printf ("Found NALU_TYPE_SUB_SPS\n");
       if (p_Inp->DecodeAllLayers== 1)
       {
         ProcessSubsetSPS(p_Vid, nalu);
@@ -1772,7 +1767,6 @@ process_nalu:
       }
       break;
     case NALU_TYPE_SLC_EXT:
-      //printf ("Found NALU_TYPE_SLC_EXT\n");
       if (p_Inp->DecodeAllLayers == 0 &&  (p_Inp->silent == FALSE))
         printf ("Found SVC extension NALU (%d). Ignoring.\n", (int) nalu->nal_unit_type);
       break;

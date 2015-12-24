@@ -76,11 +76,11 @@ static const byte NTAB3[2][2][2] =
   {{2,0},{1,1}},
 };
 
-extern int read_se_v (char *tracestring, Bitstream *bitstream, int *used_bits);
-extern int read_ue_v (char *tracestring, Bitstream *bitstream, int *used_bits);
-extern Boolean read_u_1 (char *tracestring, Bitstream *bitstream, int *used_bits);
-extern int read_u_v (int LenInBits, char *tracestring, Bitstream *bitstream, int *used_bits);
-extern int read_i_v (int LenInBits, char *tracestring, Bitstream *bitstream, int *used_bits);
+extern int read_se_v (char *tracestring, Bitstream *bitstream, DecoderParams* p_Dec);
+extern int read_ue_v (char *tracestring, Bitstream *bitstream, DecoderParams* p_Dec);
+extern Boolean read_u_1 (char *tracestring, Bitstream *bitstream, DecoderParams* p_Dec);
+extern int read_u_v (int LenInBits, char *tracestring, Bitstream *bitstream, DecoderParams* p_Dec);
+extern int read_i_v (int LenInBits, char *tracestring, Bitstream *bitstream, DecoderParams* p_Dec);
 
 // CAVLC mapping
 extern void linfo_ue(int len, int info, int *value1, int *dummy);
