@@ -62,6 +62,13 @@ int read_next_nalu(VideoParameters *p_Vid, NALU_t *nalu)
   case PAR_OF_ANNEXB:
   	//从码流中提取一个NALU到nalu->buf,而p_Vid->annex_b->Buf中存放着包括前缀的NALU
     ret = get_annex_b_NALU(p_Vid, nalu, p_Vid->annex_b);
+		
+		p_Dec->cur_nal_start_pos = p_Dec->pre_nal_start_pos + p_Dec->pre_nal_len + nalu->startcodeprefix_len;
+		
+		p_Dec->pre_nal_len = nalu->len;
+		p_Dec->pre_nal_start_pos = p_Dec->cur_nal_start_pos;
+
+		//printf("p_Dec->cur_nal_start_pos = %d\n",p_Dec->cur_nal_start_pos);
     break;
   case PAR_OF_RTP:
     ret = GetRTPNALU(p_Vid, nalu, p_Vid->BitStreamFile);

@@ -16,7 +16,6 @@
 
 #include "contributors.h"
 #include "global.h"
-#include "nalucommon.h"
 
  /*!
  ************************************************************************
@@ -64,6 +63,8 @@ int RBSPtoSODB(byte *streamBuffer, int last_byte_pos)
       return(last_byte_pos);
   }
 */
+
+	//p_Dec->cur_h264_pos += 1;	//加上一个NALU头
   return(last_byte_pos);
 
 }

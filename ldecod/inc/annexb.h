@@ -17,7 +17,7 @@
 typedef struct annex_b_struct 
 {
   int  BitStreamFile;                //!< the bit stream file fd文件描述符
-  byte *iobuffer;					//h264文件
+  byte *iobuffer;					//h264文件,长度为bytesinbuffer
   byte *iobufferread;
   int bytesinbuffer;		//实际读入到iobuffer的长度
   int is_eof;

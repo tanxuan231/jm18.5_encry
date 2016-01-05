@@ -258,14 +258,14 @@ int main(int argc, char **argv)
 
   //get input parameters;
   Configure(&InputParams, argc, argv);
-  //open decoder;
 
 	//if ((ExtractLogFileHandle = fopen(ExtractLogFile, "rb")) == NULL)    // append new statistic at the end
 	if ((ExtractLogFileHandle = fopen(ExtractLogFile, "wb")) == NULL)
 	{
 		printf("Log File Open Fail\n");
 	}
-  
+
+	//open decoder;
   iRet = OpenDecoder(&InputParams);	//打开trace文件
   if(iRet != DEC_OPEN_NOERR)
   {
@@ -275,6 +275,7 @@ int main(int argc, char **argv)
 
 	now = time(NULL);
 	strftime(buf, 24, "%Y-%m-%d %H:%M:%S", localtime(&now));
+	
   do
   {
     iRet = DecodeOneFrame(&pDecPicList);
@@ -283,7 +284,7 @@ int main(int argc, char **argv)
       //process the decoded picture, output or display;
       iFramesOutput += WriteOneFrame(pDecPicList, hFileDecOutput0, hFileDecOutput1, 0);
       iFramesDecoded++;
-	  NumberOfFrame=iFramesDecoded;
+	  	NumberOfFrame=iFramesDecoded;
     }
     else
     {

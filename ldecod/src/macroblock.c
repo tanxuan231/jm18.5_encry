@@ -509,6 +509,41 @@ int writeMotionVector8x8 (Macroblock *currMB, //<--  current Macroblock
 }
 #endif
 
+//将bitoffset变成 byteoffset*8 + bitoffset
+void analysis_bitoffset(int* bitoffset, int* byteoffset)
+{
+	int i = 0;
+	int org = *bitoffset;
+
+	while(org>7)
+	{
+		org -= 8;
+		i ++;
+	}
+
+	*bitoffset = org;
+	*byteoffset = i;
+}
+
+void write_mvd2keyfile(int offset, int len, int mvd)
+{
+	if(g_encrypt_fileh)
+	{
+		int ByteOffset = 0;		
+		int BitOffset = offset;
+		analysis_bitoffset(&BitOffset,&ByteOffset);
+		//ByteOffset += p_Dec->cur_nal_start_pos + 1;
+		//ByteOffset += p_Dec->pre_nal_start_pos + 1;
+		int nalu_pos = p_Dec->pre_nal_start_pos + 1;
+		
+		char s[200];
+		snprintf(s,200,"NALU+1pos: %4d, ByteOffset: %8d, BitOffset: %3d, len: %4d, mvd: %2d\n",
+			nalu_pos,ByteOffset,BitOffset,len,mvd);		
+		fwrite(s,strlen(s),1,g_encrypt_fileh);
+		//fflush(g_encrypt_fileh);
+	}
+}
+
 /*!
  ************************************************************************
  * \brief
@@ -551,8 +586,12 @@ static void readMBMotionVectors (SyntaxElement *currSE, DataPartition *dP, Macro
 #endif
       currSE->value2 = list; // identifies the component; only used for context determination
       //readSyntaxElement_UVLC
+	  int offset = dP->bitstream->frame_bitoffset;
       dP->readSyntaxElement(currMB, currSE, dP);	//se(v)|ae(v)
-      curr_mvd[0] = (short) currSE->value1;              
+	  int len = currSE->len;	  	  
+      curr_mvd[0] = (short) currSE->value1;              	  
+
+  		write_mvd2keyfile(dP->bitstream->frame_bitoffset-currSE->len, currSE->len,curr_mvd[0]);
 
       // Y component
 #if TRACE
@@ -562,10 +601,7 @@ static void readMBMotionVectors (SyntaxElement *currSE, DataPartition *dP, Macro
       dP->readSyntaxElement(currMB, currSE, dP);
       curr_mvd[1] = (short) currSE->value1;              
 
-		char s[200];
-		//snprintf(s,200,"\n",);
-		if(g_encrypt_fileh)
-			//fwrite(s,strlen(s),1,g_encrypt_fileh);				
+		write_mvd2keyfile(dP->bitstream->frame_bitoffset-currSE->len, currSE->len,curr_mvd[1]);			
 		
 		curr_mv.mv_x = (short)(curr_mvd[0] + pred_mv.mv_x);  // compute motion vector x
 		curr_mv.mv_y = (short)(curr_mvd[1] + pred_mv.mv_y);  // compute motion vector y            
@@ -645,7 +681,9 @@ static void readMBMotionVectors (SyntaxElement *currSE, DataPartition *dP, Macro
 #endif
                 currSE->value2   = (k << 1) + list; // identifies the component; only used for context determination
                 dP->readSyntaxElement(currMB, currSE, dP);
-                curr_mvd[k] = (short) currSE->value1;              
+                curr_mvd[k] = (short) currSE->value1;     
+
+				write_mvd2keyfile(dP->bitstream->frame_bitoffset-currSE->len, currSE->len,curr_mvd[k]);
               }
 
               curr_mv.mv_x = (short)(curr_mvd[0] + pred_mv.mv_x);  // compute motion vector 
@@ -760,7 +798,9 @@ void start_macroblock(Slice *currSlice, Macroblock **currMB)
   (*currMB)->slice_nr = (short) currSlice->current_slice_nr;
 
   //判断相邻宏块的可用性
+  #if 0
   CheckAvailabilityOfNeighbors(*currMB);
+  #endif
 
   // Select appropriate MV predictor function
   //为mvd和重建图像分配空间
@@ -837,7 +877,7 @@ Boolean exit_macroblock(Slice *currSlice, int eos_bit)
 
   if(currSlice->current_mb_nr == p_Vid->PicSizeInMbs - 1) //if (p_Vid->num_dec_mb == p_Vid->PicSizeInMbs)
   {
-    return TRUE;
+    return TRUE;	//前解码帧中所有的宏块解码结束,返回true
   }
   // ask for last mb in the slice  CAVLC
   else

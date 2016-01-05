@@ -99,7 +99,7 @@ int FirstPartOfSliceHeader(Slice *currSlice)
   else
     currSlice->colour_plane_id = PLANE_Y;
 
-  return p_Dec->UsedBits;
+  return p_Dec->UsedBits;	//first_mb_in_slice slice_type pic_parameter_set_id使用的总位数
 }
 
 /*!

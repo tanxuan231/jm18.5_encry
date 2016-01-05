@@ -24,7 +24,7 @@
 //Luma:     0) 所有残差（包括 DC、AC）都不编码。  
 //              1) 只对 DC 系数编码。  
 //              2) 所有残差（包括 DC、AC）都编码
-//cbp = NCBP[other/normal][cbp][intra/inter]
+//cbp = NCBP[chroma_format_idc][codeNum][intra_4x4,intra_8x8/inter]
 static const byte NCBP[2][48][2]=
 {
   {  // 0      1        2       3       4       5       6       7       8       9      10      11

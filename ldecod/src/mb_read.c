@@ -1354,6 +1354,7 @@ static void read_one_macroblock_i_slice_cabac(Macroblock *currMB)
  */
 static void read_one_macroblock_p_slice_cavlc(Macroblock *currMB)
 {
+	//printf("\033[1;33m tmp_test===============p_Dec->UsedBits = %d======= \033[0m \n",p_Dec->UsedBits);
   Slice *currSlice = currMB->p_Slice;
   SyntaxElement currSE;
   int mb_nr = currMB->mbAddrX; 

@@ -174,6 +174,7 @@ static void init_mvc_picture(Slice *currSlice)
  *    Initializes the parameters for a new picture
  ************************************************************************
  */
+//当读取到新一帧的第一个片时调用 
 static void init_picture(VideoParameters *p_Vid, Slice *currSlice, InputParameters *p_Inp)
 {
   int i;
@@ -820,6 +821,7 @@ int decode_one_frame(DecoderParams *pDecoder)
   current_header=0;
   p_Vid->iNumOfSlicesDecoded=0;  //解码片的序号
   p_Vid->num_dec_mb = 0;
+	
   if(p_Vid->newframe)
   {
     if(p_Vid->pNextPPS->Valid) //下一个PPS有效
@@ -840,12 +842,13 @@ int decode_one_frame(DecoderParams *pDecoder)
 
     UseParameterSet (currSlice);
 
-    init_picture(p_Vid, currSlice, p_Inp);
+    init_picture(p_Vid, currSlice, p_Inp);	//当读取到新一帧的第一个片时调用
     
     p_Vid->iSliceNumOfCurrPic++;
     current_header = SOS;
   }
-  while(current_header != SOP && current_header !=EOS)
+	
+  while(current_header != SOP && current_header != EOS)
   {
     //no pending slices;
     assert(p_Vid->iSliceNumOfCurrPic < p_Vid->iNumOfSlicesAllocated);
@@ -866,7 +869,8 @@ int decode_one_frame(DecoderParams *pDecoder)
     currSlice->is_reset_coeff = FALSE;
     currSlice->is_reset_coeff_cr = FALSE;
 
-    current_header = read_new_slice(currSlice);
+		//读取一个新的条带,每个条带打包成一个NALU,并处理slice_header
+    current_header = read_new_slice(currSlice);	
     //init;
     currSlice->current_header = current_header;
 
@@ -874,13 +878,14 @@ int decode_one_frame(DecoderParams *pDecoder)
     Error_tracking(p_Vid, currSlice);
     // If primary and redundant are received and primary is correct, discard the redundant
     // else, primary slice will be replaced with redundant slice.
+    //redundant_pic_cnt 对于那些属于基本编码图像的条带和条带数据分割块应等于0(非0冗余编码图像)
     if(currSlice->frame_num == p_Vid->previous_frame_num && currSlice->redundant_pic_cnt !=0
       && p_Vid->Is_primary_correct !=0 && current_header != EOS)
     {
       continue;
     }
 
-    if((current_header != SOP && current_header !=EOS) || (p_Vid->iSliceNumOfCurrPic==0 && current_header == SOP))
+    if((current_header != SOP && current_header != EOS) || (p_Vid->iSliceNumOfCurrPic == 0 && current_header == SOP))
     {
        currSlice->current_slice_nr = (short) p_Vid->iSliceNumOfCurrPic;
        p_Vid->dec_picture->max_slice_id = (short) imax(currSlice->current_slice_nr, p_Vid->dec_picture->max_slice_id);
@@ -889,7 +894,7 @@ int decode_one_frame(DecoderParams *pDecoder)
          CopyPOC(*ppSliceList, currSlice);
          ppSliceList[p_Vid->iSliceNumOfCurrPic-1]->end_mb_nr_plus1 = currSlice->start_mb_nr;
        }
-       p_Vid->iSliceNumOfCurrPic++;
+       p_Vid->iSliceNumOfCurrPic++;	//关键
        if(p_Vid->iSliceNumOfCurrPic >= p_Vid->iNumOfSlicesAllocated)
        {
          Slice **tmpSliceList = (Slice **)realloc(p_Vid->ppSliceList, (p_Vid->iNumOfSlicesAllocated+MAX_NUM_DECSLICES)*sizeof(Slice*));
@@ -926,27 +931,28 @@ int decode_one_frame(DecoderParams *pDecoder)
 
     copy_slice_info(currSlice, p_Vid->old_slice); //currSlice -> old_slice
   }
+	
   iRet = current_header;
   init_picture_decoding(p_Vid);
 
+	//循环解码一帧中的所有条带
+  for(iSliceNo=0; iSliceNo<p_Vid->iSliceNumOfCurrPic; iSliceNo++)
   {
-    for(iSliceNo=0; iSliceNo<p_Vid->iSliceNumOfCurrPic; iSliceNo++)
-    {
-      currSlice = ppSliceList[iSliceNo];
-      current_header = currSlice->current_header;
-      //p_Vid->currentSlice = currSlice;
+    currSlice = ppSliceList[iSliceNo];
+    current_header = currSlice->current_header;
+    //p_Vid->currentSlice = currSlice;
 
-      assert(current_header != EOS);
-      assert(currSlice->current_slice_nr == iSliceNo);
+    assert(current_header != EOS);
+    assert(currSlice->current_slice_nr == iSliceNo);
 
-      init_slice(p_Vid, currSlice);
-      decode_slice(currSlice, current_header);
+    init_slice(p_Vid, currSlice);
+    decode_slice(currSlice, current_header);
 
-      p_Vid->iNumOfSlicesDecoded++;
-      p_Vid->num_dec_mb += currSlice->num_dec_mb;
-      p_Vid->erc_mvperMB += currSlice->erc_mvperMB;
-    }
+    p_Vid->iNumOfSlicesDecoded++;
+    p_Vid->num_dec_mb += currSlice->num_dec_mb;
+    p_Vid->erc_mvperMB += currSlice->erc_mvperMB;
   }
+	
 #if MVC_EXTENSION_ENABLE
   p_Vid->last_dec_view_id = p_Vid->dec_picture->view_id;
 #endif
@@ -958,7 +964,8 @@ int decode_one_frame(DecoderParams *pDecoder)
     p_Vid->last_dec_poc = p_Vid->dec_picture->bottom_poc;
   exit_picture(p_Vid, &p_Vid->dec_picture);
   p_Vid->previous_frame_num = ppSliceList[0]->frame_num;
-  return (iRet);
+	
+  return (iRet);	//返回current_header
 }
 
 /*!
@@ -1352,7 +1359,7 @@ int read_new_slice(Slice *currSlice)
 
   int slice_id_a, slice_id_b, slice_id_c;
 
-  for (;;)
+  for (;;)	//处理完SPS,PPS,SEI后会break回到此处
   {
 #if (MVC_EXTENSION_ENABLE)
     currSlice->svc_extension_flag = -1;
@@ -1425,7 +1432,7 @@ process_nalu:
       currSlice->dp_mode = PAR_DP_1;
       currSlice->max_part_nr = 1;
 #if (MVC_EXTENSION_ENABLE)
-      if (currSlice->svc_extension_flag != 0)
+      if (currSlice->svc_extension_flag != 0)  // = -1
       {
         currStream = currSlice->partArr[0].bitstream;
         currStream->ei_flag = 0;
@@ -1500,6 +1507,7 @@ process_nalu:
       // the parameter set ID of the SLice header.  Hence, read the pic_parameter_set_id
       // of the slice header first, then setup the active parameter sets, and then read
       // the rest of the slice header
+      //条带头语法
       BitsUsedByHeader = FirstPartOfSliceHeader(currSlice);  //读取条带头的三个语法元素(first_mb_in_slice~pps_id)
       UseParameterSet (currSlice);	//设置参数
       currSlice->active_sps = p_Vid->active_sps;
@@ -1507,7 +1515,9 @@ process_nalu:
       currSlice->Transform8x8Mode = p_Vid->active_pps->transform_8x8_mode_flag;
       currSlice->chroma444_not_separate = (p_Vid->active_sps->chroma_format_idc==YUV444)&&((p_Vid->separate_colour_plane_flag == 0));
 
-      BitsUsedByHeader += RestOfSliceHeader (currSlice);	//BitsUsedByHeader包括了slice_header语法元素的位数
+      BitsUsedByHeader = RestOfSliceHeader (currSlice);	//BitsUsedByHeader包括了slice_header语法元素的位数
+
+			/* record slice_header used bits *///从p_Dec->cur_nal_start_pos+1+BitsUsedByHeader/8开始为当前条带的第一个宏块的数据
 #if (MVC_EXTENSION_ENABLE)
       if(currSlice->view_id >=0)
       {
@@ -1525,7 +1535,7 @@ process_nalu:
 
       if(is_new_picture(p_Vid->dec_picture, currSlice, p_Vid->old_slice))
       {
-        if(p_Vid->iSliceNumOfCurrPic==0)
+        if(p_Vid->iSliceNumOfCurrPic==0)	//如果是一个新的图像且是第一个条带,则初始化一个图片
           init_picture(p_Vid, currSlice, p_Inp);
 
         current_header = SOP;
@@ -1535,8 +1545,9 @@ process_nalu:
       else
         current_header = SOS;
 
-/****根据slice type设置预测模式(read mv info from NAL)*/
-      setup_slice_methods(currSlice);	//包含slice_data()语法
+			/****根据slice type设置预测模式(read mv info from NAL)*/
+			//包含slice_data()语法
+      setup_slice_methods(currSlice);	
 
       // From here on, p_Vid->active_sps, p_Vid->active_pps and the slice header are valid
       if (currSlice->mb_aff_frame_flag)
@@ -1553,9 +1564,10 @@ process_nalu:
         }
         arideco_start_decoding (&currSlice->partArr[0].de_cabac, currStream->streamBuffer, ByteStartPosition, &currStream->read_len);
       }
-      // printf ("read_new_slice: returning %s\n", current_header == SOP?"SOP":"SOS");
+
       //FreeNALU(nalu);
       p_Vid->recovery_point = 0;
+
       return current_header;
       break;
     case NALU_TYPE_DPA:
@@ -1722,18 +1734,12 @@ process_nalu:
       break;
     case NALU_TYPE_SEI:
       InterpretSEIMessage(nalu->buf,nalu->len,p_Vid, currSlice);
-			p_Dec->pre_h264_pos = p_Dec->cur_h264_pos;
-      p_Dec->cur_h264_pos += nalu->next_nalu_start_prefix;			
       break;
     case NALU_TYPE_PPS:
       ProcessPPS(p_Vid, nalu);
-			p_Dec->pre_h264_pos = p_Dec->cur_h264_pos;
-      p_Dec->cur_h264_pos += nalu->next_nalu_start_prefix;
       break;
     case NALU_TYPE_SPS:
       ProcessSPS(p_Vid, nalu);
-			p_Dec->pre_h264_pos = p_Dec->cur_h264_pos;
-      p_Dec->cur_h264_pos += nalu->next_nalu_start_prefix;
       break;
     case NALU_TYPE_AUD:
       break;
@@ -2511,7 +2517,8 @@ void decode_one_slice(Slice *currSlice)
     init_cur_imgy(currSlice,p_Vid); 
 
   //reset_ec_flags(p_Vid);
-  //宏块循环
+  
+  //宏块解码循环
   while (end_of_slice == FALSE) // loop over macroblocks
   {
 
@@ -2522,6 +2529,7 @@ void decode_one_slice(Slice *currSlice)
     // Initializes the current macroblock
     //计算宏块，块，像素的坐标；宏块结构语法元素的初始化；
     //相邻块的可用性；以及滤波参数
+
     start_macroblock(currSlice, &currMB);
     // Get the syntax elements from the NAL
     //熵解码：包括解出宏块类型、预测模式、MVD、CBP、
@@ -2554,14 +2562,9 @@ void decode_one_slice(Slice *currSlice)
 	default: break;
     }
     
-    mbNumber++;
-/*   fprintf(stdout,"Number %d mb in Silce %d type %d %s, MB Type %d %s\n", mbNumber,currSlice->frame_num,currSlice->slice_type, \
-		currSlice->slice_type==0?"P_Slice":currSlice->slice_type==1?"B_Slice":currSlice->slice_type==2?"I_Slice":"OtherSilce", currMB->mb_type,
-		currMB->mb_type==0?"P&B_SKIP":currMB->mb_type==1?"P16x16":currMB->mb_type==2?"P16x8":currMB->mb_type==3?"P8x16": \
-		currMB->mb_type==4?"SMB8x8":currMB->mb_type==5?"SMB8x4":currMB->mb_type==6?"SMB4x8":currMB->mb_type==7?"SMB4x4": \
-		currMB->mb_type==8?"P8x8":currMB->mb_type==9?"I4MB":currMB->mb_type==10?"I16MB":currMB->mb_type==11?"IBLOCK": \
-		currMB->mb_type==12?"SI4MB":currMB->mb_type==13?"I8MB":"IPCM");
-*/   
+    mbNumber++; 
+
+	#if 0
    //反变换及运动补偿：反量化反变换、运动补偿、像素重构等
    decode_one_macroblock(currMB, currSlice->dec_picture);
 
@@ -2575,9 +2578,11 @@ void decode_one_slice(Slice *currSlice)
     //写入各个8*8块的预测模式及运动向量到错误隐藏变量中
     ercWriteMBMODEandMV(currMB);
 #endif
-
+	#endif
+	
+	//每解完一个宏块，调用宏块解码后处理函数,判断是否解码完一个条带
     end_of_slice = exit_macroblock(currSlice, (!currSlice->mb_aff_frame_flag|| currSlice->current_mb_nr%2));
-  }
+  }  //宏块循环
 
   
   //reset_ec_flags(p_Vid);

@@ -319,7 +319,7 @@ struct bit_stream_dec
   int           read_len;           //!< actual position in the codebuffer, CABAC only
   int           code_len;           //!< SODB数据的长度 overall codebuffer length, CABAC only
   // CAVLC Decoding
-  int           frame_bitoffset;    //所在位置!< actual position in the codebuffer, bit-oriented, CAVLC only
+  int           frame_bitoffset;    //当前码流元素针对NALU的偏移!< actual position in the codebuffer, bit-oriented, CAVLC only
   int           bitstream_length;   //!< SODB数据的长度 over codebuffer lnegth, byte oriented, CAVLC only
   // ErrorConcealment
   byte          *streamBuffer;      //!<除掉NAL头(0x67)的RBSP(SODB)数据 actual codebuffer for read bytes
@@ -430,7 +430,7 @@ typedef struct slice
   int                 slice_qp_delta;	//语法元素值slice_qp_delta
   int                 qs;				//用于SI SP中的qp
   int                 slice_qs_delta;	//语法元素值slice_qs_delta
-  int                 slice_type;    //!< slice type
+  int                 slice_type;    //!< slice type SliceType
   int                 model_number;  //!< cabac model number cabac_init_idc(0~2)
   unsigned int        frame_num;   //frame_num for this frame
   unsigned int        field_pic_flag;	//0:帧编码
@@ -1054,12 +1054,19 @@ typedef struct decoder_params
   InputParameters   *p_Inp;          //!< Input Parameters
   VideoParameters   *p_Vid;          //!< Image Parameters
   int64              bufferSize;     //!< buffersize for tiff reads (not currently supported)
-  int                UsedBits;      // for internal statistics, is adjusted by read_se_v, read_ue_v, read_u_1
+  int                UsedBits;       // for internal statistics, is adjusted by read_se_v, read_ue_v, read_u_1
   FILE              *p_trace;        //!< Trace file
-  int                bitcounter;	//@起始比特位置
+  int                bitcounter;	   //@起始比特位置
+
+	int  BitStreamFile;
+	
+	int pre_nal_len;				//nalu->len
+	off_t pre_nal_start_pos;
+	off_t cur_nal_start_pos;	//当前NALU起始位置(相对于h264文件的起始偏移)
 
 	int pre_h264_pos;	//上一个解码文件的位置
-  int cur_h264_pos;	//当前解码文件指针位置,相对于前一个的偏移
+  int cur_h264_pos;	//当前解码文件指针位置,相对于前一个的偏移(字节为单位)
+  int cur_h264_bit_offset;	//usedbits%8余数
 } DecoderParams;
 
 extern DecoderParams  *p_Dec;

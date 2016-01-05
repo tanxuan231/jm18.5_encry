@@ -71,7 +71,7 @@ int read_ue_v (char *tracestring, Bitstream *bitstream, DecoderParams* p_LocalDe
 
   //assert (bitstream->streamBuffer != NULL);
   symbol.type = SE_HEADER;
-  symbol.mapping = linfo_ue;   // Mapping rule
+  symbol.mapping = linfo_ue;   //Mapping rule
   SYMTRACESTRING(tracestring);
   readSyntaxElement_VLC (&symbol, bitstream);
   p_LocalDec->UsedBits += symbol.len;

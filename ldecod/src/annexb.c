@@ -17,7 +17,7 @@
 #include "memalloc.h" 
 #include "fast_memory.h"
 
-static const int IOBUFFERSIZE = 512*1024; //65536;
+static const int IOBUFFERSIZE = 512*1024; //8*65536=524288;
 
 void malloc_annex_b(VideoParameters *p_Vid, ANNEXB_t **p_annex_b)
 {
@@ -326,6 +326,8 @@ void open_annex_b (char *fn, ANNEXB_t *annex_b)
     error ("open_annex_b: cannot allocate IO buffer",500);
   }
   annex_b->is_eof = FALSE;
+
+	p_Dec->BitStreamFile = annex_b->BitStreamFile;
   getChunk(annex_b);
 }
 
